@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="utf-8"?>
+<klayout-macro>
+ <description/>
+ <version/>
+ <category>pymacros</category>
+ <prolog/>
+ <epilog/>
+ <doc/>
+ <autorun>true</autorun>
+ <autorun-early>false</autorun-early>
+ <priority>0</priority>
+ <shortcut/>
+ <show-in-menu>false</show-in-menu>
+ <group-name/>
+ <menu-path/>
+ <interpreter>python</interpreter>
+ <dsl-interpreter-name/>
+ <text>import os 
+import pya
+import math
+
+class SplitShapePlugin(pya.Plugin):
+    def __init__(self, view):
+        super(SplitShapePlugin, self).__init__()
+        self.view            = view
+        self.centerSnap      = False
+        self.directions      = ["V", "H", "VH"]
+        self.cutDirection    = self.directions[0]
+        
+        self.withSelected    = False
+        self.selectedObj     = None
+        self.selectedPoly    = None  
+        self.selectedObjBox  = None  
+
+        self.cutMarkers      = None
+        self.cutEdges        = None
+
+    def activated(self):
+        self.validselect()
+
+    def deactivated(self):
+        self._clear_marker()
+        self.ungrab_mouse()
+
+    def deactive(self):
+        esc_key  = 16777216 
+        keyPress = pya.QKeyEvent(pya.QKeyEvent.KeyPress, esc_key, pya.Qt.NoModifier)
+        pya.QApplication.sendEvent(self.view.widget(), keyPress)        
+
+    def validselect(self):
+        unit         = self.view.active_cellview().layout().dbu
+        selectedObjs = [o for o in self.view.each_object_selected() if not(o.is_cell_inst())]
+        if len(selectedObjs) == 1:
+            o                   = selectedObjs[0]
+            self.selectedPoly   = o.shape.polygon.transformed(o.trans()).to_dtype(unit)
+            self.selectedObj    = o
+            self.selectedObjBox = self.selectedPoly.bbox()
+            self.withSelected   = True
+        else:
+            self.withSelected   = False
+
+            
+    def _clear_marker(self):
+        self._clear_cut_marker()
+
+    def _clear_cut_marker(self):
+        if self.cutMarkers is not None:
+            for marker in self.cutMarkers:
+                marker._destroy()
+            self.cutMarkers = None
+            self.cutEdges   = None
+
+    def _update_marker(self):
+        self._update_cut_marker()
+
+    def _update_cut_marker(self):
+        if self.cutEdges:
+            if self.cutMarkers is None:
+                self._clear_cut_marker()
+                self.cutMarkers = []
+                for edge in self.cutEdges:
+                    marker             = pya.Marker(self.view)
+                    marker.line_style  = 0
+                    marker.line_width  = 1
+                    marker.vertex_size = 8 
+                    self.cutMarkers.append(marker)
+                    
+            for i, edge in enumerate(self.cutEdges):
+                self.cutMarkers[i].set(edge)
+            
+        else:
+            self._clear_cut_marker()
+
+    def mouse_click_event(self, p, buttons, prio):
+        if prio:
+            if buttons in [8]:
+                self.view.transaction("slice Shape")
+                try:
+                    cellView = self.view.active_cellview()
+                    cell     = cellView.cell
+                    unit     = cellView.layout().dbu
+                    shape    = self.selectedObj.shape
+                    layer    = shape.layer
+                    section  = 0
+                    out_reg  = pya.Region()
+                    poly_reg = pya.Region(self.selectedPoly.to_itype(unit)) 
+                    
+                    for box in self.cut_box(p, centerSnap = self.centerSnap):
+                        mask_reg = pya.Region(box.to_itype(unit))
+                        cut_reg  = poly_reg &amp; mask_reg
+                        out_reg += cut_reg
+                        section  = section + (0 if cut_reg.is_empty() else 1)
+
+                    if section &gt; 1:    
+                        cell.shapes(layer).insert(out_reg)
+                        shape.delete()
+                    
+                finally:
+                    self.view.commit()
+                self.deactive()
+                
+            if buttons in [16, 32]:
+                nextIndex         = (self.directions.index(self.cutDirection) + 1 )
+                nextIndex         = nextIndex if nextIndex &lt; len(self.directions) else 0
+                self.cutDirection = self.directions[nextIndex]
+                self._clear_cut_marker()
+                self.update_cut_edge(p)
+                self._update_cut_marker()
+                
+            self._update_marker()
+            return True
+        return False
+
+    def mouse_moved_event(self, p, buttons, prio):
+        if prio:
+            if self.withSelected:
+                self.set_cursor(pya.Cursor.Cross)
+                self.update_cut_edge(p, centerSnap = self.centerSnap)
+                
+            else:
+                pya.QToolTip().showText( pya.QCursor.pos, "Select one shape for split shape") 
+                self.deactive()
+            self._update_marker()
+            return True
+        return False
+    
+    def key_event(self, key, buttons):
+        if buttons == 2:
+            self.centerSnap = not(self.centerSnap)
+
+    def cut_box(self, p, centerSnap = False):
+        p1     = self.selectedObjBox.p1
+        p2     = self.selectedObjBox.p2
+        c      = self.selectedObjBox.center()
+        p      = c if centerSnap else p
+
+        xbound = p.x if (p1.x &lt;= p.x &lt;= p2.x) else sorted([p1.x , p.x , p2.x])[1]
+        ybound = p.y if (p1.y &lt;= p.y &lt;= p2.y) else sorted([p1.y , p.y , p2.y])[1]
+        
+        vCutBoxL = pya.DBox(
+            pya.DPoint(  p1.x, p1.y), 
+            pya.DPoint(xbound, p2.y)
+        )
+        
+        vCutBoxR = pya.DBox(
+            pya.DPoint(xbound, p1.y), 
+            pya.DPoint(  p2.x, p2.y)
+        )
+        
+        hCutBoxT = pya.DBox(
+            pya.DPoint(p1.x,   p2.y), 
+            pya.DPoint(p2.x, ybound)
+        )
+        hCutBoxB = pya.DBox(
+            pya.DPoint(p1.x,   p1.y), 
+            pya.DPoint(p2.x, ybound)
+        )
+        
+        if self.cutDirection == "V":
+            return [vCutBoxL, vCutBoxR]
+            
+        if self.cutDirection == "H":
+            return [hCutBoxT, hCutBoxB]
+            
+        if self.cutDirection == "VH":
+            return [vCutBoxL &amp; hCutBoxB, vCutBoxL &amp; hCutBoxT, vCutBoxR &amp; hCutBoxB, vCutBoxR &amp; hCutBoxT ]
+
+            
+            
+    def update_cut_edge(self, p, centerSnap = False):
+        p1     = self.selectedObjBox.p1
+        p2     = self.selectedObjBox.p2
+        c      = self.selectedObjBox.center()
+        p      = c if centerSnap else p
+        
+        xbound = p.x if (p1.x &lt;= p.x &lt;= p2.x) else sorted([p1.x , p.x , p2.x])[1]
+        ybound = p.y if (p1.y &lt;= p.y &lt;= p2.y) else sorted([p1.y , p.y , p2.y])[1]
+        
+        vCutEdge = pya.DEdge(
+            pya.DPoint(xbound, p1.y), 
+            pya.DPoint(xbound, p2.y)
+        )
+
+        hCutEdge = pya.DEdge(
+            pya.DPoint(p1.x, ybound), 
+            pya.DPoint(p2.x, ybound)
+        )
+        
+        if self.cutDirection == "V":
+            self.cutEdges = [vCutEdge]
+            
+        if self.cutDirection == "H":
+            self.cutEdges = [hCutEdge]
+            
+        if self.cutDirection == "VH":
+            self.cutEdges = [vCutEdge, hCutEdge]
+        
+class SplitShapePluginFactory(pya.PluginFactory):
+    def __init__(self):
+        super(SplitShapePluginFactory, self).__init__()
+        iconPath = str(os.path.dirname(__file__)) + "/SplitShapeIcon/%s.png"
+        self.register(-1000, "Split Shape", "Split Shape", iconPath % "icon")
+
+    def create_plugin(self, manager, root, view):
+        return SplitShapePlugin(view)
+
+SplitShapePluginFactory.instance = SplitShapePluginFactory()
+
+</text>
+</klayout-macro>
