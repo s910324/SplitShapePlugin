@@ -1,0 +1,2 @@
+# SplitShapePlugin
+SplitShapePlugin for Klayout
