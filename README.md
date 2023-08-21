@@ -3,16 +3,18 @@
 <img align="middle" src="https://github.com/s910324/SplitShapePlugin/assets/1561043/3294446a-a2a9-484d-a3a6-7dbc439566b2" alt="installation" width="800"/>
 </p>
 
+
+
 # Installation and setup
 This app can be installed through KLayout package manager
 After installation the app can be accessed through toolbar, split shape icon
 
-# Functions
+# Functions 
 * Horizontal split
 * Vertical split
 * Cross split
 * Center split
-
+https://www.klayout.de/forum/discussion/894/slice-a-shape-into-two-parts#latest
 
 
 ### Shape Split
