@@ -14,7 +14,7 @@ After installation the app can be accessed through toolbar, split shape icon
 * Vertical split
 * Cross split
 * Center split
-* 
+  
 (https://www.klayout.de/forum/discussion/894/slice-a-shape-into-two-parts)
 
 
