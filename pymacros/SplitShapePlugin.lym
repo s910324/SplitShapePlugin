@@ -18,20 +18,19 @@
  <text>import os 
 import pya
 import math
+import functools
 
 class SplitShapePlugin(pya.Plugin):
     def __init__(self, view):
         super(SplitShapePlugin, self).__init__()
         self.view            = view
         self.centerSnap      = False
-        self.directions      = ["V", "H", "VH"]
+        self.directions      = ["V", "H", "VH", "LS", "RS"]
         self.cutDirection    = self.directions[0]
         
         self.withSelected    = False
-        self.selectedObj     = None
-        self.selectedPoly    = None  
-        self.selectedObjBox  = None  
-
+        self.selectedObjs    = []
+        self.selectedObjBox  = None
         self.cutMarkers      = None
         self.cutEdges        = None
 
@@ -48,17 +47,14 @@ class SplitShapePlugin(pya.Plugin):
         pya.QApplication.sendEvent(self.view.widget(), keyPress)        
 
     def validselect(self):
-        unit         = self.view.active_cellview().layout().dbu
-        selectedObjs = [o for o in self.view.each_object_selected() if not(o.is_cell_inst())]
-        if len(selectedObjs) == 1:
-            o                   = selectedObjs[0]
-            self.selectedPoly   = o.shape.polygon.transformed(o.trans()).to_dtype(unit)
-            self.selectedObj    = o
-            self.selectedObjBox = self.selectedPoly.bbox()
+        unit              = self.view.active_cellview().layout().dbu
+        self.selectedObjs = [o for o in self.view.each_object_selected() if not(o.is_cell_inst())]
+        self.withSelected = False
+        
+        if self.selectedObjs:
+            boxList             = [o.shape.polygon.transformed(o.trans()).to_dtype(unit).bbox() for o in self.selectedObjs]
+            self.selectedObjBox = functools.reduce(lambda a, b: a+b, boxList)
             self.withSelected   = True
-        else:
-            self.withSelected   = False
-
             
     def _clear_marker(self):
         self._clear_cut_marker()
@@ -99,21 +95,25 @@ class SplitShapePlugin(pya.Plugin):
                     cellView = self.view.active_cellview()
                     cell     = cellView.cell
                     unit     = cellView.layout().dbu
-                    shape    = self.selectedObj.shape
-                    layer    = shape.layer
-                    section  = 0
-                    out_reg  = pya.Region()
-                    poly_reg = pya.Region(self.selectedPoly.to_itype(unit)) 
-                    
-                    for box in self.cut_box(p, centerSnap = self.centerSnap):
-                        mask_reg = pya.Region(box.to_itype(unit))
-                        cut_reg  = poly_reg &amp; mask_reg
-                        out_reg += cut_reg
-                        section  = section + (0 if cut_reg.is_empty() else 1)
 
-                    if section &gt; 1:    
+                    for o in [o.dup() for o in self.selectedObjs]:
+                        shape    = o.shape
+                        layer    = shape.layer
+                        out_reg  = pya.Region()
+                        poly_reg = pya.Region(shape.polygon.transformed(o.trans())) 
+                        
+                        for box in self.cut_box(p, centerSnap = self.centerSnap):
+                            mask_reg = pya.Region(box.to_itype(unit))
+                            cut_reg  = poly_reg &amp; mask_reg
+                            out_reg += cut_reg
+       
                         cell.shapes(layer).insert(out_reg)
-                        shape.delete()
+                    
+                    for o in self.selectedObjs:
+                        try:
+                            o.shape.delete()
+                        except:
+                            pass
                     
                 finally:
                     self.view.commit()
@@ -143,6 +143,14 @@ class SplitShapePlugin(pya.Plugin):
             self._update_marker()
             return True
         return False
+        
+    ''' 
+    def 	wheel_event(self, delta, horizontal, p, buttons, prio):
+        if prio:
+            print (delta)
+            return True
+        return False    
+    '''
     
     def key_event(self, key, buttons):
         if buttons == 2:
@@ -151,11 +159,14 @@ class SplitShapePlugin(pya.Plugin):
     def cut_box(self, p, centerSnap = False):
         p1     = self.selectedObjBox.p1
         p2     = self.selectedObjBox.p2
+        w      = self.selectedObjBox.width()
+        h      = self.selectedObjBox.height()
         c      = self.selectedObjBox.center()
         p      = c if centerSnap else p
 
         xbound = p.x if (p1.x &lt;= p.x &lt;= p2.x) else sorted([p1.x , p.x , p2.x])[1]
         ybound = p.y if (p1.y &lt;= p.y &lt;= p2.y) else sorted([p1.y , p.y , p2.y])[1]
+        p      = pya.DPoint(xbound, ybound)
         
         vCutBoxL = pya.DBox(
             pya.DPoint(  p1.x, p1.y), 
@@ -171,11 +182,44 @@ class SplitShapePlugin(pya.Plugin):
             pya.DPoint(p1.x,   p2.y), 
             pya.DPoint(p2.x, ybound)
         )
+        
         hCutBoxB = pya.DBox(
             pya.DPoint(p1.x,   p1.y), 
             pya.DPoint(p2.x, ybound)
         )
         
+        lsCutBoxL= pya.DPolygon([
+            pya.DPoint(p1.x - h, p1.y), 
+            pya.DPoint(p1.x - h, p2.y), 
+            pya.DPoint(p.x + (p2.y -  p.y), p2.y),
+            pya.DPoint(p.x - (p.y  - p1.y), p1.y),
+            pya.DPoint(p1.x - h, p1.y)
+        ])     
+        
+        lsCutBoxR= pya.DPolygon([
+            pya.DPoint(p2.x + h, p1.y), 
+            pya.DPoint(p2.x + h, p2.y), 
+            pya.DPoint(p.x + (p2.y -  p.y), p2.y),
+            pya.DPoint(p.x - (p.y  - p1.y), p1.y),
+            pya.DPoint(p2.x + h, p1.y)
+        ])     
+               
+        rsCutBoxL = pya.DPolygon([
+            pya.DPoint(p1.x - h, p1.y), 
+            pya.DPoint(p1.x - h, p2.y), 
+            pya.DPoint(p.x - (p2.y -  p.y), p2.y), 
+            pya.DPoint(p.x + (p.y  - p1.y), p1.y), 
+            pya.DPoint(p1.x - h, p1.y) 
+        ])          
+        
+        rsCutBoxR = pya.DPolygon([
+            pya.DPoint(p2.x - h, p1.y), 
+            pya.DPoint(p2.x - h, p2.y), 
+            pya.DPoint(p.x - (p2.y -  p.y), p2.y), 
+            pya.DPoint(p.x + (p.y  - p1.y), p1.y), 
+            pya.DPoint(p2.x - h, p1.y) 
+        ])          
+                         
         if self.cutDirection == "V":
             return [vCutBoxL, vCutBoxR]
             
@@ -185,8 +229,12 @@ class SplitShapePlugin(pya.Plugin):
         if self.cutDirection == "VH":
             return [vCutBoxL &amp; hCutBoxB, vCutBoxL &amp; hCutBoxT, vCutBoxR &amp; hCutBoxB, vCutBoxR &amp; hCutBoxT ]
 
+        if self.cutDirection == "LS":
+            return [lsCutBoxL, lsCutBoxR ]
             
-            
+        if self.cutDirection == "RS":
+            return [rsCutBoxL, rsCutBoxR ]
+                        
     def update_cut_edge(self, p, centerSnap = False):
         p1     = self.selectedObjBox.p1
         p2     = self.selectedObjBox.p2
@@ -195,6 +243,7 @@ class SplitShapePlugin(pya.Plugin):
         
         xbound = p.x if (p1.x &lt;= p.x &lt;= p2.x) else sorted([p1.x , p.x , p2.x])[1]
         ybound = p.y if (p1.y &lt;= p.y &lt;= p2.y) else sorted([p1.y , p.y , p2.y])[1]
+        p      = pya.DPoint(xbound, ybound)
         
         vCutEdge = pya.DEdge(
             pya.DPoint(xbound, p1.y), 
@@ -205,7 +254,17 @@ class SplitShapePlugin(pya.Plugin):
             pya.DPoint(p1.x, ybound), 
             pya.DPoint(p2.x, ybound)
         )
+
+        lsCutEdge = pya.DEdge(
+            pya.DPoint(p.x - (p.y  - p1.y), p1.y), 
+            pya.DPoint(p.x + (p2.y -  p.y), p2.y), 
+        ).clipped(self.selectedObjBox)
         
+        rsCutEdge = pya.DEdge(
+            pya.DPoint(p.x + (p.y  - p1.y), p1.y), 
+            pya.DPoint(p.x - (p2.y -  p.y), p2.y), 
+        ).clipped(self.selectedObjBox)
+                
         if self.cutDirection == "V":
             self.cutEdges = [vCutEdge]
             
@@ -214,7 +273,13 @@ class SplitShapePlugin(pya.Plugin):
             
         if self.cutDirection == "VH":
             self.cutEdges = [vCutEdge, hCutEdge]
-        
+            
+        if self.cutDirection == "LS":
+            self.cutEdges = [lsCutEdge]
+            
+        if self.cutDirection == "RS":
+            self.cutEdges = [rsCutEdge] 
+                   
 class SplitShapePluginFactory(pya.PluginFactory):
     def __init__(self):
         super(SplitShapePluginFactory, self).__init__()
