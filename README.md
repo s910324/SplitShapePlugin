@@ -10,10 +10,13 @@ This app can be installed through KLayout package manager
 After installation the app can be accessed through toolbar, split shape icon
 
 # Functions 
+* Split multiple shapes from different layers
 * Horizontal split
 * Vertical split
 * Cross split
-* Center split
+* 45 deg split
+* Center split (toggle by ctrl)
+
   
 (https://www.klayout.de/forum/discussion/894/slice-a-shape-into-two-parts)
 
