@@ -45,3 +45,7 @@ After installation the app can be accessed through toolbar, split shape icon
 
 * Once the split mode is active, use ctrl button to toggle the line to shape center
 * Left click to apply change
+
+# ChangeLog
+### 0.01
+* Bug fix for 45 deg cut shape disappear issue
