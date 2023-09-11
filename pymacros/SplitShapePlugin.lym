@@ -6,7 +6,7 @@
  <prolog/>
  <epilog/>
  <doc/>
- <autorun>true</autorun>
+ <autorun>false</autorun>
  <autorun-early>false</autorun-early>
  <priority>0</priority>
  <shortcut/>
@@ -213,8 +213,8 @@ class SplitShapePlugin(pya.Plugin):
         ])          
         
         rsCutBoxR = pya.DPolygon([
-            pya.DPoint(p2.x - h, p1.y), 
-            pya.DPoint(p2.x - h, p2.y), 
+            pya.DPoint(p2.x + h, p1.y), 
+            pya.DPoint(p2.x + h, p2.y), 
             pya.DPoint(p.x - (p2.y -  p.y), p2.y), 
             pya.DPoint(p.x + (p.y  - p1.y), p1.y), 
             pya.DPoint(p2.x - h, p1.y) 
