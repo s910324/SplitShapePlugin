@@ -55,3 +55,4 @@ After installation the app can be accessed through toolbar, split shape icon
 * Fix layer begin shape rec error caused by layers without number/datatype information.
 * Update snap module
 * Update User interface with better visibility
+* Update project structure
