@@ -1,6 +1,6 @@
 # SplitShapePlugin
 <p align="center">
-<img align="middle" src="https://github.com/s910324/SplitShapePlugin/assets/1561043/3294446a-a2a9-484d-a3a6-7dbc439566b2" alt="installation" width="800"/>
+<img align="middle" src="https://github.com/s910324/SplitShapePlugin/assets/1561043/12819491-1aee-4e0f-8638-e53bc35246a3" alt="installation" width="800"/>
 </p>
 
 
