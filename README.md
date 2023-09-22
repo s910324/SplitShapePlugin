@@ -16,6 +16,7 @@ After installation the app can be accessed through toolbar, split shape icon
 * Cross split
 * 45 deg split
 * Center split (toggle by ctrl)
+* Snap to shapes
 
   
 (https://www.klayout.de/forum/discussion/894/slice-a-shape-into-two-parts)
@@ -49,3 +50,8 @@ After installation the app can be accessed through toolbar, split shape icon
 # ChangeLog
 ### 0.01
 * Bug fix for 45 deg cut shape disappear issue
+
+### 0.02
+* Fix layer begin shape rec error caused by layers without number/datatype information.
+* Update snap module
+* Update User interface with better visibility
