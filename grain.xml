@@ -3,7 +3,7 @@
  <name>SplitShapePlugin</name>
  <token/>
  <hidden>false</hidden>
- <version>0.01</version>
+ <version>0.02</version>
  <api-version/>
  <title>SplitShapePlugin</title>
  <doc>Provide L-edit/Cadance/Laker split shape function</doc>
