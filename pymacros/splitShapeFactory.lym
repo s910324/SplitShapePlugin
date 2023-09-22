@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<klayout-macro>
+ <description/>
+ <version/>
+ <category>pymacros</category>
+ <prolog/>
+ <epilog/>
+ <doc/>
+ <autorun>true</autorun>
+ <autorun-early>false</autorun-early>
+ <priority>100</priority>
+ <shortcut/>
+ <show-in-menu>false</show-in-menu>
+ <group-name/>
+ <menu-path/>
+ <interpreter>python</interpreter>
+ <dsl-interpreter-name/>
+ <text>import os 
+import sys
+import pya
+from   importlib import reload  
+
+libPath  = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "python"))
+iconPath = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "icon"))
+
+if not libPath in sys.path:
+  sys.path.insert(0, libPath)
+  
+
+import splitShapePlugin
+import snapHandler
+reload(snapHandler)
+reload(splitShapePlugin)
+
+class SplitShapePluginFactory(pya.PluginFactory):
+    def __init__(self):
+        super(SplitShapePluginFactory, self).__init__()
+        self.register(-1000, "Split Shape", "Split Shape", iconPath + "/icon.png" )
+        
+    def create_plugin(self, manager, root, view):
+        return splitShapePlugin.SplitShapePlugin(view)
+
+SplitShapePluginFactory.instance = SplitShapePluginFactory()
+
+
+
+
+ </text>
+</klayout-macro>
