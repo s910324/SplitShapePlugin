@@ -16,7 +16,7 @@ After installation the app can be accessed through toolbar, split shape icon
 * Cross split
 * 45 deg split
 * Center split (toggle by ctrl)
-* Snap to shapes
+* Snap to shapes, edge, edge center, vertex, shape center point
 
   
 (https://www.klayout.de/forum/discussion/894/slice-a-shape-into-two-parts)
