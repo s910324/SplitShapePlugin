@@ -1,57 +1,34 @@
 import pya
 import math
-# V20230922
+import misc
+from typing import Union, Dict, List
+from   enum import IntEnum
+import markerTheme as mkThm
 
+# V20230923
 
+class SnapPolicy(IntEnum):
+    showSearchRange = 0b000001
+    snapCenter      = 0b000010
+    snapVertex      = 0b000100
+    snapEdge        = 0b001000
+    snapEdgeCenter  = 0b010000
+    snapDefault     = 0b001110
+    
 class SnapHandler:
-    def __init__(self, view, showSearchRange = False , snapCenter = True, snapVertex = True, snapEdge = True):
+    def __init__(self, view : pya.LayoutView, snapPolicy : SnapPolicy = SnapPolicy.snapDefault):
         self.view            = view
         self.markPropList    = []
         self.activeMarkers   = []
-
-        self.showSearchRange = showSearchRange
-        self.snapCenter      = snapCenter
-        self.snapVertex      = snapVertex
-        self.snapEdge        = snapEdge
-
-    def vectorRotate(self, v, angle):
-        rad = angle * 0.0174533 
-        return pya.DVector(v.x * math.cos(rad) - v.y * math.sin(rad), v.x * math.sin(rad) + v.y * math.cos(rad))
-
-    def displayLength(self, length):
-        vp_trans    = self.view.viewport_trans()
-        canvasRes   = 1 / max([self.view.viewport_height(), self.view.viewport_width()])
-        return length / canvasRes / vp_trans.mag
-
-    def edgeToArrowPath(self, edge, unitLength, direction = 1):
-        arrow_length     = self.displayLength(unitLength)
-        arrow_width_half = arrow_length * 0.25882 
-        arrow_len_vector = (edge.p1 - edge.p2) / edge.length() * arrow_length
-        arrow_wid_vector = self.vectorRotate((edge.p1 - edge.p2) / edge.length() * arrow_width_half, 90)
-        arrowPath        = pya.DPath ([
-            edge.p2,
-            edge.p2 + arrow_len_vector * direction - arrow_wid_vector,
-            edge.p2 + arrow_len_vector * direction + arrow_wid_vector,
-            edge.p2,
-            
-            edge.p1,
-            edge.p1 - arrow_len_vector * direction - arrow_wid_vector,
-            edge.p1 - arrow_len_vector * direction + arrow_wid_vector,
-            edge.p1,
-            ], 0)
-        return arrowPath
+        self.setSnapPolicy(snapPolicy)
         
-    def setShowSearchRange(self, show):
-        self.showSearchRange = show
-
-    def enableSnapCenter(self, snap):
-        self.snapCenter = snap
-
-    def enableSnapVertex(self, snap):
-        self.snapVertex = snap
-
-    def enableSnapEdge(self, snap):
-        self.snapEdge   = snap        
+    def setSnapPolicy(self, snapPolicy : SnapPolicy):
+        self.snapPolicy      = snapPolicy
+        self.showSearchRange = (snapPolicy & SnapPolicy.showSearchRange) > 0
+        self.snapCenter      = (snapPolicy & SnapPolicy.snapCenter)      > 0
+        self.snapVertex      = (snapPolicy & SnapPolicy.snapVertex)      > 0
+        self.snapEdge        = (snapPolicy & SnapPolicy.snapEdge)        > 0
+        self.snapEdgeCenter  = (snapPolicy & SnapPolicy.snapEdgeCenter)  > 0       
 
     def clearMarkers(self):
         for marker in self.activeMarkers:
@@ -74,77 +51,39 @@ class SnapHandler:
             self.activeMarkers.append(marker)
         self.markPropList = []
 
-    def cursorMark(self, p, detectRange):
-        cross_length = self.displayLength(0.01)
-        dia1_length  = cross_length / 4
-        vx           = pya.DVector(cross_length, 0)
-        vy           = pya.DVector(0, cross_length)
-        vxy          = pya.DVector(detectRange, detectRange)
+    def cursorMark(self, p : pya.DPoint ):
+        crossLength = misc.dPixelLength(self.view, 20)
+        return mkThm.cursorMark(p, crossLength)
 
-        return [{
-            "data"  : pya.DPolygon([p + self.vectorRotate(pya.DVector(dia1_length, 0), 360/32 * i) for i in range(33)]), 
-            "theme" : {"line_width" : 1, "line_style" : 0, "vertex_size" : 0}
-        },{
-            "data"  : pya.DEdge(p + vy, p - vy), 
-            "theme" : {"line_width" : 1, "line_style" : 1, "vertex_size" : 0}
-        },{
-            "data"  : pya.DEdge(p + vx, p - vx), 
-            "theme" : {"line_width" : 1, "line_style" : 1, "vertex_size" : 0}
-        },{
-            "data"  : pya.DBox(p - vxy, p + vxy), 
-            "theme" : {"line_width" : 1, "line_style" : 1, "vertex_size" : 0}
-        }][0:3 if self.showSearchRange else -1]
-           
+        
+    def detectRangeMark(self, p : pya.DPoint, detectRange : Union[int, float]):
+        return mkThm.detectRangeMark(p, detectRange)
              
-    def centerMark(self, shape):
-        c  = shape.bbox().center()
-        vl = self.displayLength(0.005)
-        vx = pya.DVector(vl, 0)
-        vy = pya.DVector(0, vl)
-        return [{
-            "data"  : pya.DEdge(c + vy, c - vy), 
-            "theme" : {"line_width" : 1, "line_style" : 0, "vertex_size" : 0}
-        },{
-            "data"  : pya.DEdge(c + vx, c - vx), 
-            "theme" : {"line_width" : 1, "line_style" : 0, "vertex_size" : 0}
-        }]
+    def centerMark(self, shape : pya.DPolygon):
+        crossLength = misc.dPixelLength(self.view, 5)
+        return mkThm.centerMark(shape, crossLength)
         
-    def edgeMark(self, edge):
-        return {
-            "data"  : self.edgeToArrowPath(edge, 0.01, 1), 
-            "theme" : {"line_width" : 1, "line_style" : 0, "vertex_size" : 0}
-        }    
+    def edgeMark(self, edge : pya.DEdge):
+        arrowLength = misc.dPixelLength(self.view, 20)
+        direction   = 1
+        return mkThm.edgeArrowMark(edge, arrowLength, direction)
         
-    def vertexMark(self, p):
-        cross_length = self.displayLength(0.01)
-        dia2_length  = cross_length / 4 * 2
-        dia1_length  = cross_length / 4
+    def edgeCenterMark(self, edge : pya.DEdge):
+        markLength  = misc.dPixelLength(self.view, 20)
+        return mkThm.edgeCenterMark(edge, markLength)
+                
+    def vertexMark(self, p : pya.DPoint):
+        crossLength = misc.dPixelLength(self.view, 20)
+        return mkThm.vertexMark(p, crossLength)
         
-        vx = pya.DVector(cross_length, 0)
-        vy = pya.DVector(0, cross_length)
-        
-        return [{
-            "data"  : pya.DPolygon([p + self.vectorRotate(pya.DVector(dia2_length, 0), 360/32 * i) for i in range(33)]), 
-            "theme" : {"line_width" : 1, "line_style" : 0, "vertex_size" : 0}
-        },{
-            "data"  : pya.DPolygon([p + self.vectorRotate(pya.DVector(dia1_length, 0), 360/32 * i) for i in range(33)]), 
-            "theme" : {"line_width" : 1, "line_style" : 0, "vertex_size" : 0}
-        },{
-            "data"  : pya.DEdge(p + vy, p - vy), 
-            "theme" : {"line_width" : 1, "line_style" : 1, "vertex_size" : 0}
-        },{
-            "data"  : pya.DEdge(p + vx, p - vx), 
-            "theme" : {"line_width" : 1, "line_style" : 1, "vertex_size" : 0}
-        }]
-        
-    def vertexInRange(self, point, vertex, detectRange):
+    def vertexInRange(self, point : pya.DPoint, vertex : pya.DPoint, detectRange : Union[int, float]):
         inXRange   = (vertex.x - detectRange) <= point.x <= (vertex.x + detectRange)
         inYRange   = (vertex.y - detectRange) <= point.y <= (vertex.y + detectRange)
         detected   = all([inXRange, inYRange])
         return detected
         
-    def edgeInRange(self, point, edge, detectRange):
-        detectArea = pya.DPath([edge.p1, edge.p2], detectRange * 2).simple_polygon()
+    def edgeInRange(self, point : pya.DPoint, edge : pya.DEdge, detectRange : Union[int, float]):
+        detectArea = pya.DPath([edge.p1, edge.p2], detectRange * 2, detectRange, detectRange).simple_polygon()
         detected   = detectArea.inside(point)
         return detected
     
@@ -156,21 +95,24 @@ class SnapHandler:
             if lyp.visible: result.append(lyp.layer_index())
             itr.next()
         return result
-    
-    def shapeInRange(self, rangeDBox):
+ 
+    def shapeInRange(self, rangeDBox : pya.DBox, layerIDList : List[int]):
         result        = []
         cellView      = self.view.active_cellview()
         unit          = cellView.layout().dbu
         cell          = cellView.cell
         visibleLayers = self.visibleLayers()
         
-        for li in visibleLayers:
+        for li in layerIDList:
             for o in cell.begin_shapes_rec_touching(li, rangeDBox):
-                if not(o.shape().is_text()):
+                if (o.shape().polygon):
                     result.append(o.shape().polygon.transformed(o.trans()).to_dtype(unit))
         return result
         
-    def snapPoint(self, point, edge_point): 
+    def shapeInVisibleRange(self, rangeDBox : pya.DBox):
+        return self.shapeInRange(rangeDBox, self.visibleLayers())
+
+    def snapPoint(self, point : pya.DPoint, edge_point : Union[pya.DEdge, pya.DPoint]): 
         if isinstance(edge_point, pya.DEdge):
             edge = edge_point
             dx   = edge.p2.x - edge.p1.x 
@@ -183,7 +125,7 @@ class SnapHandler:
                 return pya.DPoint(point.x,(point.x - edge.p1.x)/dx * dy + edge.p1.y)
         if isinstance(edge_point, pya.DPoint):
             return edge_point       
-        return None
+        return point
 
     def markPropsAppend(self, markProps):
         if isinstance(markProps, dict):
@@ -192,15 +134,16 @@ class SnapHandler:
             for markProp in markProps:
                 self.markPropsAppend(markProp)
                 
-    def snapToObject(self, p, searchSize, rangeDBox = None):
+                 
+    def snapToObject(self, p : pya.DPoint, detectRange : Union[int, float], hoverShapes : List[pya.DPolygon]):
         cell             = self.view.active_cellview().cell
-        minDistance      = searchSize
-        rngDVector       = pya.DVector(searchSize, searchSize)
-        rangeDBox        = rangeDBox if rangeDBox else pya.DBox(p - rngDVector, p + rngDVector)
-        hoverShapes      = self.shapeInRange(rangeDBox) 
+        minDistance      = detectRange
+        ranegDVector     = pya.DVector(detectRange, detectRange)
+        rangeDBox        = pya.DBox(p - ranegDVector, p + ranegDVector)
         centerShapes     = sorted(hoverShapes, key = lambda hoveredShape: hoveredShape.bbox().center().distance(p))[0:10] if self.snapCenter else []
         hlVertex         = None
         hlEdge           = None
+        hlCenter         = None
         snapPoint        = p
         
         self.markPropsAppend([self.centerMark(centerShape) for centerShape in centerShapes])
@@ -208,37 +151,57 @@ class SnapHandler:
         for hoveredShape in hoverShapes:
                
             for e in hoveredShape.each_edge():
-                if self.edgeInRange(p, e, searchSize):
+                if self.edgeInRange(p, e, detectRange):
                     epDistance  = e.distance_abs(p)
-                    pp1Distance = e.p1.distance(p)
-                    pp2Distance = e.p2.distance(p)
-                    
+
                     if epDistance <= minDistance:
                         minDistance = epDistance
                         snapPoint   = self.snapPoint(p, e) if self.snapEdge else p
                         hlEdge      = e                    if self.snapEdge else hlEdge
                         
-                        ppDistance = min([pp1Distance, pp2Distance])
+                        ppc         = pya.DPoint((e.p1.x + e.p2.x)/2, (e.p1.y + e.p2.y)/2)
+                        pointDists  = [
+                            {"point" : e.p1, "distance" : e.p1.distance(p)},
+                            {"point" : e.p2, "distance" : e.p2.distance(p)},
+                            {"point" : ppc,  "distance" : ppc.distance(p)},
+                        ]
+                        pointDists = pointDists if self.snapEdgeCenter else pointDists[0:2]
+                        pointDist  = sorted(pointDists, key = lambda pd : pd["distance"])[0]
+                        ppDistance = pointDist["distance"]
                         hlVertex   = None
+                        
                         if (ppDistance < (minDistance * 2)):
-                            v = e.p1 if (pp1Distance < pp2Distance) else e.p2
-                            if self.vertexInRange(p, v, searchSize):
+                            v = pointDist["point"]
+                            if self.vertexInRange(p, v, detectRange):
                                 snapPoint   = self.snapPoint(p, v) if self.snapVertex else p
                                 hlVertex    = v                    if self.snapVertex else hlVertex
 
             center = hoveredShape.bbox().center()
-            if self.vertexInRange(p, center, searchSize):
+            if self.vertexInRange(p, center, detectRange):
                 cpDistance = center.distance(p)
                 if (cpDistance < (minDistance * 2)):
                     snapPoint = self.snapPoint(p, center) if self.snapCenter else p
-                    hlVertex  = center                    if self.snapVertex else hlVertex
+                    hlCenter  = center                    if self.snapVertex else hlCenter
 
-        if hlVertex:
-            self.markPropsAppend(self.vertexMark(hlVertex))
+        if hlCenter:
+            self.markPropsAppend(self.cursorMark(snapPoint))
+            
         else:
-            self.markPropsAppend(self.cursorMark(p, searchSize))
+        
+            if hlEdge: 
+                self.markPropsAppend(self.edgeMark(hlEdge))
+                
+                if self.snapEdgeCenter:
+                    self.markPropsAppend(self.edgeCenterMark(hlEdge))
+            
+            if hlVertex:
+                self.markPropsAppend(self.vertexMark(hlVertex))
+                
+            else:
+                self.markPropsAppend(self.cursorMark(snapPoint))
              
-        if hlEdge:
-            self.markPropsAppend(self.edgeMark(hlEdge))                                                        
+        if self.showSearchRange:
+            self.markPropsAppend(self.detectRangeMark(p, detectRange))                                                    
 
         return snapPoint
+    
