@@ -47,6 +47,10 @@ After installation the app can be accessed through toolbar, split shape icon
 * Once the split mode is active, use ctrl button to toggle the line to shape center
 * Left click to apply change
 
+# Known bugs
+* Snap shape not working properly if multiple cell view is opened.
+* Snap shape cannot snap to shapes in different cell view
+
 # ChangeLog
 ### 0.01
 * Bug fix for 45 deg cut shape disappear issue
@@ -56,3 +60,11 @@ After installation the app can be accessed through toolbar, split shape icon
 * Update snap module
 * Update User interface with better visibility
 * Update project structure
+* 
+### 0.03
+* Fix unable to start correctly bug from V0.02
+* Make snap shape into a standalone object
+* Snap range now is uses pixel range instead of fixed range
+* Snap shape object now supports customize snap type policy
+* Snap shape object now supports customize snap shape list
+* Support snap to edge center
