@@ -26,11 +26,16 @@ iconPath = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "icon"
 if not libPath in sys.path:
   sys.path.insert(0, libPath)
   
-
-import splitShapePlugin
+import misc
 import snapHandler
+import markerTheme
+import splitShapePlugin
+
+reload(misc)
 reload(snapHandler)
+reload(markerTheme)
 reload(splitShapePlugin)
+
 
 class SplitShapePluginFactory(pya.PluginFactory):
     def __init__(self):
